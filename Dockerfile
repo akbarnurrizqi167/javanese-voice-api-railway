@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     gcc \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -18,8 +19,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir --timeout 600 -r requirements.txt
 
-# Copy application and models
-COPY app/main_production.py app/main.py
+# Copy application (using working version)
+COPY app/main_working.py app/main.py
 COPY app/__init__.py app/
 COPY models/ models/
 
