@@ -1,14 +1,32 @@
-# 🚀 Javanese Aksara Voice Recognition API - Railway
+# 🚀 Javanese Aksara Voice Recognition API - Railway Production
 
-Fast and reliable API for recognizing Javanese aksara characters from voice input, optimized for Railway deployment.
+Production-ready API for recognizing Javanese aksara characters from voice input, with real ML model integration deployed on Railway.
 
 ## 🎯 Features
 
-- **Enhanced CNN Model**: 94.67% accuracy with 210K parameters
-- **FastAPI Backend**: High-performance async API
+- **Real ML Model**: Enhanced CNN with 94.67% accuracy 
+- **Production Ready**: Full ML pipeline with actual voice recognition
+- **FastAPI Backend**: High-performance async API with TensorFlow
 - **20 Javanese Aksara**: Complete traditional character support
-- **Audio Processing**: Automatic WAV conversion and normalization
-- **Railway Optimized**: Lightweight dependencies and fast startup
+- **Audio Processing**: Real MFCC feature extraction and audio preprocessing
+- **Railway Optimized**: Docker containerized for reliable deployment
+
+## 📁 Project Structure
+
+```
+├── app/
+│   ├── main_production.py     # Production API with real ML model
+│   ├── main_light.py          # Light version for testing
+│   └── main.py                # Original minimal version
+├── models/
+│   ├── javanese_enhanced_retrain.h5      # Trained CNN model
+│   └── label_encoder_retrain.pkl         # Label encoder
+├── requirements.txt                       # Production dependencies
+├── requirements-light.txt                # Light dependencies  
+├── Dockerfile                            # Production Docker
+├── Dockerfile.light                      # Light Docker
+└── railway.json                          # Railway deployment config
+```
 
 ## 🔗 Quick Links
 

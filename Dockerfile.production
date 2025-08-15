@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy production requirements
+COPY requirements-production.txt requirements.txt
 
-# Install packages
+# Install Python packages
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir --timeout 600 -r requirements.txt
 
