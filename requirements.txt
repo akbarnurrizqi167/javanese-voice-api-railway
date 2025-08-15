@@ -8,3 +8,4 @@ numpy==1.23.5
 pydub==0.25.1
 soundfile==0.12.1
 scipy==1.9.3
+h5py==3.8.0

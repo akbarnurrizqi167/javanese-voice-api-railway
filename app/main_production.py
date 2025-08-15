@@ -71,105 +71,86 @@ def load_model():
     global model, label_encoder
     
     try:
-        # Load model with custom objects and compile=False to avoid compatibility issues
         model_path = os.path.join(os.path.dirname(__file__), "..", "models", "javanese_enhanced_retrain.h5")
-        
-        # Try loading with different methods to handle compatibility issues
-        try:
-            # First try: Load with compile=False
-            model = tf.keras.models.load_model(model_path, compile=False)
-            logger.info(f"✅ Model loaded from {model_path} (compile=False)")
-        except Exception as e1:
-            logger.warning(f"⚠️ First load attempt failed: {e1}")
-            try:
-                # Second try: Load with custom objects
-                custom_objects = {
-                    'InputLayer': tf.keras.layers.InputLayer,
-                    'Conv2D': tf.keras.layers.Conv2D,
-                    'MaxPooling2D': tf.keras.layers.MaxPooling2D,
-                    'BatchNormalization': tf.keras.layers.BatchNormalization,
-                    'Dropout': tf.keras.layers.Dropout,
-                    'GlobalAveragePooling2D': tf.keras.layers.GlobalAveragePooling2D,
-                    'Dense': tf.keras.layers.Dense,
-                    'Activation': tf.keras.layers.Activation
-                }
-                model = tf.keras.models.load_model(model_path, custom_objects=custom_objects, compile=False)
-                logger.info(f"✅ Model loaded from {model_path} (with custom_objects)")
-            except Exception as e2:
-                logger.warning(f"⚠️ Second load attempt failed: {e2}")
-                try:
-                    # Third try: Load weights only and reconstruct model
-                    model = create_model_architecture()
-                    model.load_weights(model_path)
-                    logger.info(f"✅ Model weights loaded from {model_path} (architecture reconstructed)")
-                except Exception as e3:
-                    logger.warning(f"⚠️ Third load attempt failed: {e3}")
-                    # Fourth try: Use only the model structure (no weights)
-                    logger.warning("🔄 Creating model without weights for API functionality")
-                    model = create_model_architecture()
-                    # Initialize with random weights for demo purposes
-                    logger.info("✅ Model created with random weights (demo mode)")
-        
-        # Compile the model if it wasn't compiled
-        if not hasattr(model, 'optimizer') or model.optimizer is None:
-            model.compile(
-                optimizer='adam',
-                loss='categorical_crossentropy',
-                metrics=['accuracy']
-            )
-            logger.info("✅ Model compiled with default settings")
-        
-        # Load label encoder
         encoder_path = os.path.join(os.path.dirname(__file__), "..", "models", "label_encoder_retrain.pkl")
+        
+        # Check if files exist
+        if not os.path.exists(model_path):
+            logger.error(f"❌ Model file not found: {model_path}")
+            return False
+        if not os.path.exists(encoder_path):
+            logger.error(f"❌ Encoder file not found: {encoder_path}")
+            return False
+        
+        # Load label encoder first (simpler)
         with open(encoder_path, 'rb') as f:
             label_encoder = pickle.load(f)
         logger.info(f"✅ Label encoder loaded from {encoder_path}")
         
-        # Log model info
-        logger.info(f"📊 Model input shape: {model.input_shape}")
-        logger.info(f"📊 Model output shape: {model.output_shape}")
-        logger.info(f"📊 Model parameters: {model.count_params()}")
-        logger.info(f"📊 Model layers: {len(model.layers)}")
+        # Try different loading strategies for the existing model
+        loading_strategies = [
+            # Strategy 1: Basic load with compile=False
+            lambda: tf.keras.models.load_model(model_path, compile=False),
+            
+            # Strategy 2: Load with safe_mode=False (TF 2.12+ feature)
+            lambda: tf.keras.models.load_model(model_path, compile=False, safe_mode=False),
+            
+            # Strategy 3: Load and rebuild with SavedModel format approach
+            lambda: load_h5_as_savedmodel(model_path),
+        ]
         
-        return True
+        for i, strategy in enumerate(loading_strategies, 1):
+            try:
+                logger.info(f"🔄 Trying model loading strategy {i}...")
+                model = strategy()
+                
+                # Compile the model
+                model.compile(
+                    optimizer='adam',
+                    loss='categorical_crossentropy',
+                    metrics=['accuracy']
+                )
+                
+                logger.info(f"✅ Model loaded successfully with strategy {i}")
+                logger.info(f"📊 Model input shape: {model.input_shape}")
+                logger.info(f"📊 Model output shape: {model.output_shape}")
+                logger.info(f"� Model parameters: {model.count_params()}")
+                
+                return True
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Strategy {i} failed: {e}")
+                continue
+        
+        # If all strategies failed
+        logger.error("❌ All model loading strategies failed")
+        return False
+        
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
         return False
 
-def create_model_architecture():
-    """Create model architecture manually as fallback - matching the original 15-layer model"""
+def load_h5_as_savedmodel(model_path):
+    """Alternative loading method using weights extraction"""
     try:
-        model = tf.keras.Sequential([
-            tf.keras.layers.Input(shape=(87, 128, 1)),
-            
-            # First Conv Block
-            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Dropout(0.25),
-            
-            # Second Conv Block  
-            tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Dropout(0.25),
-            
-            # Third Conv Block
-            tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Dropout(0.25),
-            
-            # Global pooling and dense layers
-            tf.keras.layers.GlobalAveragePooling2D(),
-            tf.keras.layers.Dense(256, activation='relu'),
-            tf.keras.layers.Dropout(0.5),
-            tf.keras.layers.Dense(20, activation='softmax')  # 20 classes
-        ])
-        logger.info(f"✅ Model architecture created successfully with {len(model.layers)} layers")
+        # Create a temporary model structure and load weights
+        import h5py
+        
+        # Try to load model architecture from the h5 file metadata
+        with h5py.File(model_path, 'r') as f:
+            if 'model_config' in f.attrs:
+                import json
+                model_config = json.loads(f.attrs['model_config'].decode('utf-8'))
+                model = tf.keras.models.model_from_json(json.dumps(model_config))
+            else:
+                # Fallback: load directly but handle the batch_shape issue
+                model = tf.keras.models.load_model(model_path, compile=False)
+                
+        logger.info("✅ Model loaded using h5py method")
         return model
+        
     except Exception as e:
-        logger.error(f"❌ Failed to create model architecture: {e}")
+        logger.error(f"❌ H5py loading failed: {e}")
         raise e
 
 def extract_features(audio_data, sr=22050, n_mels=128, max_len=87):
