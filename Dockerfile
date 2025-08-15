@@ -1,25 +1,21 @@
 FROM python:3.9-slim
 
-# Install system dependencies
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libc6-dev \
-    libsndfile1 \
-    libsndfile1-dev \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install packages
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip==21.3.1
+# Copy light requirements
+COPY requirements-ultra-light.txt requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY . .
+COPY app/main_light.py app/main.py
+COPY app/__init__.py app/
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
